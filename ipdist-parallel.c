@@ -568,6 +568,7 @@ static void stop_reporter(libtrace_t *trace, libtrace_thread_t *thread, void *gl
 		output_results(tally, (tally->lastkey >> 32) + 1);
 	}
 	/* Cleanup tally results*/
+	free(tally->stats);
 	free(tally);
 }
 
