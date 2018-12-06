@@ -10,7 +10,7 @@ def normalise(min, max, value):
 
 # Ensure a data directory was supplied
 if len(sys.argv) != 2:
-	print("Usage: python data-directory")
+	print("Usage: python ipdist-genplot data-directory")
 	sys.exit()
 
 dir = sys.argv[1]
@@ -43,6 +43,8 @@ for i in range(len(dataFiles)):
 		lines = tmp.readlines()
 	# increment the total skew counters
 	for x in range(4):
+		total_skew_src[x] = 0.0
+		total_skew_dst[x] = 0.0
 		total_skew_src[x] += float(lines[(4*x)+1].split()[6])
 		total_skew_dst[x] += float(lines[(4*x)+2].split()[6])
 
@@ -56,7 +58,8 @@ for i in range(len(dataFiles)):
 		tmp = open(dir + "/ipdist-timeseries-skewness.stats", "a")
 	tmp.write(tick)
 	for x in range(4):
-		tmp.write("\t" + str(total_skew_src[x]/(i+1)) + "\t" + str(total_skew_dst[x]/(i+1)))
+		#tmp.write("\t" + str(total_skew_src[x]/(i+1)) + "\t" + str(total_skew_dst[x]/(i+1)))
+		tmp.write("\t" + str(total_skew_src[x]) + "\t" + str(total_skew_dst[x]))
 	tmp.write("\n")
 	tmp.close()
 
@@ -114,51 +117,61 @@ for i in range(len(dataFiles)):
 					shell=True,
 					stdin=subprocess.PIPE,)
 
-		plot.stdin.write("set term pngcairo enhanced size 1280,960\n")
-		plot.stdin.write("set output '" + dir + "/" + filename + "-octet" + str(x+1) + ".png'\n")
-		plot.stdin.write("set multiplot layout 3,1\n")
-		plot.stdin.write("set title 'IP Distribution - " + tick + "'\n")
+		# Source
+		plot.stdin.write("set term pngcairo enhanced size 960,640\n")
+		plot.stdin.write("set output '" + dir + "/" + filename + "-octet" + str(x+1) + "-source.png'\n")
+		plot.stdin.write("set title 'Source IP Distribution octet " + str(x+1) + " time " + tick + "'\n")
 		plot.stdin.write("set xrange[0:255]\n")
-		plot.stdin.write("set y2range[-1:1]\n")
-		plot.stdin.write("set y2tics\n")
 		plot.stdin.write("set xlabel 'Prefix'\n")
 		plot.stdin.write("set ylabel 'Hits'\n")
-		plot.stdin.write("set y2label 'Skewness'\n")
-		plot.stdin.write("set xtics 0,10,255\n")
-		plot.stdin.write("stats '" + dir + "/" + statsFile + "' index " + str(x) + " every ::0::0 using 2 name 'SOURCEMEAN' nooutput\n")
-		plot.stdin.write("stats '" + dir + "/" + statsFile + "' index " + str(x) + " every ::1::1 using 2 name 'DESTMEAN' nooutput\n")
-		plot.stdin.write("stats '" + dir + "/" + statsFile + "' index " + str(x) + " every ::0::0 using 7 name 'SOURCESKEW' nooutput\n")
-		plot.stdin.write("stats '" + dir + "/" + statsFile + "' index " + str(x) + " every ::1::1 using 7 name 'DESTSKEW' nooutput\n")
-		plot.stdin.write("set arrow from SOURCEMEAN_min, graph 0 to SOURCEMEAN_min, graph 1 nohead lt 1\n")
-		plot.stdin.write("set arrow from DESTMEAN_min, graph 0 to DESTMEAN_min, graph 1 nohead lt 2\n")
-		plot.stdin.write("plot '" + dir + "/" + dataFile + "' using " + str((x*4)+3) + ":" + str((x*4)+4) + " index 0 title 'Source octet " + str(x+1) + "' smooth unique with boxes,")
-		plot.stdin.write("'' using " + str((x*4)+5) + ":" + str((x*4)+6) + " index 0 title 'Destination octet " + str(x+1) + "' smooth unique with boxes,")
-		plot.stdin.write("1/0 t 'Source mean' lt 1,")
-		plot.stdin.write("1/0 t 'Destination mean' lt 2,")
-		plot.stdin.write("SOURCESKEW_min title 'Source Skewness' axes x1y2,")
-		plot.stdin.write("DESTSKEW_min title 'Destination Skewness' axes x1y2\n")
-		plot.stdin.write("unset xrange\n")
-		plot.stdin.write("unset y2range\n")
-		plot.stdin.write("unset y2tics\n")
-		plot.stdin.write("unset y2label\n")
-		plot.stdin.write("unset ylabel\n")
-		plot.stdin.write("unset arrow\n")
-		plot.stdin.write("unset label 1\nunset label 2\nunset label 3\nunset label 4\nunset label 5\nunset label 6\n")
-		plot.stdin.write("set title 'CDF distribution'\n")
-		plot.stdin.write("set ylabel 'Cumulative %'\n")
+		plot.stdin.write("set xtics 0,10,255 rotate by 60 right\n")
+		plot.stdin.write("set yrange [0:*]\n")
+		plot.stdin.write("plot '" + dir + "/" + dataFile + "' using " + str((x*4)+3) + ":" + str((x*4)+4) + " index 0 title 'Source octet " + str(x+1) + "' smooth unique with boxes\n")
+		plot.stdin.flush()
+
+		# Destination
+		plot.stdin.write("set term pngcairo enhanced size 960,640\n")
+                plot.stdin.write("set output '" + dir + "/" + filename + "-octet" + str(x+1) + "-destination.png'\n")
+                plot.stdin.write("set title 'Destination IP Distribution octet " + str(x+1) + " time " + tick + "'\n")
+                plot.stdin.write("set xrange[0:255]\n")
                 plot.stdin.write("set xlabel 'Prefix'\n")
+                plot.stdin.write("set ylabel 'Hits'\n")
+                plot.stdin.write("set xtics 0,10,255 rotate by 60 right\n")
+		plot.stdin.write("set yrange [0:*]\n")
+		plot.stdin.write("plot '" + dir + "/" + dataFile + "' using " + str((x*4)+5) + ":" + str((x*4)+6) + " index 0 title 'Destination octet " + str(x+1) + "' smooth unique with boxes\n")
+		plot.stdin.flush()
+
+		# CDF
+		plot.stdin.write("set term pngcairo enhanced size 960,640\n")
+                plot.stdin.write("set output '" + dir + "/" + filename + "-octet" + str(x+1) + "-cdf.png'\n")
+		plot.stdin.write("set title 'CDF distribution octet " + str(x+1) + " time " + tick + "'\n")
+		plot.stdin.write("set ylabel 'Cumulative %'\n")
+		plot.stdin.write("set yrange[-0.1:1.1]\n")
+                plot.stdin.write("set xlabel 'Prefix'\n")
+		plot.stdin.write("set xtics rotate by 60 right\n")
 		plot.stdin.write("set key right bottom\n")
                 plot.stdin.write("plot '" + dir + "/ipdist-" + tick + ".tmp' using 2:1 index " + str(x) + " with lines title 'Source octet " + str(x+1) + "',")
                 plot.stdin.write("'" + dir + "/ipdist-" + tick + ".tmp' using 4:3 index " + str(x) + " with lines title 'Destination octet " + str(x+1) + "'\n")
-		plot.stdin.write("set title 'Zipf Distribution'\n")
+		plot.stdin.flush()
+
+		# Zipf distribution
+		plot.stdin.write("set term pngcairo enhanced size 960,640\n")
+                plot.stdin.write("set output '" + dir + "/" + filename + "-octet" + str(x+1) + "-zipf.png'\n")
+		plot.stdin.write("set title 'Zipf distribution octet " + str(x+1) + " time " + tick + "'\n")
 		plot.stdin.write("set xlabel 'Rank'\n")
 		plot.stdin.write("set xrange [1:255]\n")
-		plot.stdin.write("set ylabel 'Frequency'\n")
+		#plot.stdin.write("set xtics 1,10,255\n")
+		plot.stdin.write("set ylabel 'Frequency (log 10)'\n")
+		plot.stdin.write("set yrange [1:*]\n")
+		plot.stdin.write("unset yrange\n")
+		plot.stdin.write("unset xtics\n")
+		plot.stdin.write("set xtics\n")
 		plot.stdin.write("set logscale xy 10\n")
 		plot.stdin.write("set key top right\n")
 		plot.stdin.write("plot '" + dir + "/" + dataFile + "' using 2:" + str((x*4)+4) + " index 0 title 'Source octet " + str(x+1) + "',")
 		plot.stdin.write("'' using 2:" + str((x*4)+6) + " index 0 title 'Destination octet " + str(x+1) + "'\n")
 		plot.stdin.flush()
+
 		plot.communicate()
 
 
@@ -167,17 +180,16 @@ for i in range(4):
 	plot = subprocess.Popen(['gnuplot -persistent','-p'],
                                 shell=True,
                                 stdin=subprocess.PIPE,)
-	plot.stdin.write("set term pngcairo size 1280,960\n")
-	plot.stdin.write("set output '" + dir + "/ipdist-octet" + str(i+1) + ".png'\n")
-	plot.stdin.write("set multiplot layout 3,1\n")
-
+	plot.stdin.write("set term pngcairo size 960,640\n")
+	plot.stdin.write("set output '" + dir + "/ipdist-octet" + str(i+1) + "-source.png'\n")
 	plot.stdin.write("set title 'CDF source octet " + str(i+1) + "'\n")
 	plot.stdin.write("set xlabel 'Prefix'\n")
 	plot.stdin.write("set ylabel 'Cumulative %'\n")
+	plot.stdin.write("set yrange [-0.1:1.1]\n")
 	plot.stdin.write("set xrange[0:255]\n")
-	plot.stdin.write("set xtics 0,10,255\n")
+	plot.stdin.write("set xtics 0,10,255 rotate by 60 right\n")
 	plot.stdin.write("set key off\n")
-	for x in range(len(dataFiles)):
+	for x in range(0, len(dataFiles), 3):
                 dataFile = dataFiles[x]
                 filename,extension = dataFiles[x].split(".")
                 tick = filename.split("-")
@@ -188,14 +200,18 @@ for i in range(4):
 		else:
 			plot.stdin.write(" '" + dir + "/ipdist-" + tick + ".tmp' using 2:1 index " + str(i) + " title '" + tick + "' with lines,")
 	plot.stdin.write("\n")
+	plot.stdin.flush();
 
+	plot.stdin.write("set term pngcairo size 960,640\n")
+        plot.stdin.write("set output '" + dir + "/ipdist-octet" + str(i+1) + "-destination.png'\n")
 	plot.stdin.write("set title 'CDF destination octet " + str(i+1) + "'\n")
 	plot.stdin.write("set xlabel 'Prefix'\n")
         plot.stdin.write("set ylabel 'Cumulative %'\n")
+	plot.stdin.write("set yrange [-0.1:1.1]\n")
 	plot.stdin.write("set xrange[0:255]\n")
-	plot.stdin.write("set xtics 0,10,255\n")
+	plot.stdin.write("set xtics 0,10,255 rotate by 60 right\n")
 	plot.stdin.write("set key off\n")
-	for x in range(len(dataFiles)):
+	for x in range(0, len(dataFiles), 3):
 		dataFile = dataFiles[x]
                 filename,extension = dataFiles[x].split(".")
                 tick = filename.split("-")
@@ -205,8 +221,13 @@ for i in range(4):
 			plot.stdin.write("plot '" + dir + "/ipdist-" + tick + ".tmp' using 4:3 index " + str(i) + " title '" + tick + "' with lines,")
 		else:
 			plot.stdin.write(" '" + dir + "/ipdist-" + tick + ".tmp' using 4:3 index " + str(i) + " title '" + tick + "' with lines,")
+		# print every 4th result to cdf
+		x += 3
 	plot.stdin.write("\n")
+	plot.stdin.flush();
 
+	plot.stdin.write("set term pngcairo size 960,640\n")
+        plot.stdin.write("set output '" + dir + "/ipdist-octet" + str(i+1) + "-skew.png'\n")
 	plot.stdin.write("set title 'Skew octet " + str(i+1) + "'\n")
 	plot.stdin.write("set yrange[-1:1]\n")
 	plot.stdin.write("set xlabel 'Time'\n")
@@ -216,10 +237,9 @@ for i in range(4):
 	plot.stdin.write("unset xtics\n")
 	plot.stdin.write("plot '" + dir + "/ipdist-timeseries-skewness.stats' using " + str((i*2)+2) + ":xtic(1) title 'Source' with lines,")
 	plot.stdin.write("'' using " + str((i*2)+3) + ":xtic(1) title 'Destination' with lines\n")
-	plot.stdin.write("unset multiplot\n")
 	plot.stdin.flush()
-	plot.communicate()
 
+	plot.communicate()
 
 # cleanup all tmp files
 # tmp files created for CDF plots
